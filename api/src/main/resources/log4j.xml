@@ -1,0 +1,23 @@
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration debug="true" xmlns:log4j='http://jakarta.apache.org/log4j/'>
+
+    <appender name="INITIALIZER_LOGFILE_APPENDER" class="org.apache.log4j.RollingFileAppender">
+        <param name="append" value="false"/>
+        <param name="File" value="initializer.log"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%p - %C{1}.%M(%L) |%d{ISO8601}| %m%n" />
+        </layout>
+    </appender>
+
+    <logger name="org.openmrs.module.initializer" additivity="false">
+        <level value="INFO"/>
+        <appender-ref ref="INITIALIZER_LOGFILE_APPENDER"/>
+    </logger>
+
+    <root>
+        <priority value ="INFO"></priority>
+        <appender-ref ref="INITIALIZER_LOGFILE_APPENDER"/>
+    </root>
+
+</log4j:configuration>
+
