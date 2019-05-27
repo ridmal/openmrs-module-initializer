@@ -11,6 +11,7 @@ import java.util.List;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.openmrs.BaseOpenmrsData;
 import org.openmrs.BaseOpenmrsMetadata;
 import org.openmrs.BaseOpenmrsObject;
@@ -20,6 +21,7 @@ import org.openmrs.api.OpenmrsService;
 import org.openmrs.module.initializer.InitializerConstants;
 
 import com.opencsv.CSVReader;
+import org.openmrs.module.initializer.InitializerLogFactory;
 
 public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsService, P extends BaseLineProcessor<T, S>> {
 	
@@ -27,7 +29,7 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 	
 	protected static final String DEFAULT_VOID_REASON = "Voided by module " + InitializerConstants.MODULE_NAME;
 	
-	protected final Log log = LogFactory.getLog(this.getClass());
+	// protected final Log log = LogFactory.getLog(this.getClass());
 	
 	protected CSVReader reader;
 	
@@ -40,6 +42,8 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 	
 	// The current line
 	protected String[] line = new String[0];
+	
+	static Logger logger = InitializerLogFactory.getLog();
 	
 	public CsvParser(InputStream is, S service) throws IOException {
 		this.service = service;
@@ -73,7 +77,7 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 		// Boostrapping
 		P bootstrapper = getAnyLineProcessor();
 		if (bootstrapper == null) { // no processors available
-			log.warn(
+			logger.warn(
 			    "No line processors have been set, you should either overload '" + getClass().getEnclosingMethod().getName()
 			            + "' directly or provide lines processors to this class: " + getClass().getCanonicalName());
 			return null;
@@ -182,7 +186,7 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 				}
 			}
 			catch (Exception e) {
-				log.error("An OpenMRS object could not be constructed or saved from the following CSV line: "
+				logger.error("An OpenMRS object could not be constructed or saved from the following CSV line: "
 				        + Arrays.toString(line),
 				    e);
 			}

@@ -1,5 +1,6 @@
 package org.openmrs.module.initializer.api;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,8 +13,10 @@ import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.log4j.Logger;
 import org.openmrs.BaseOpenmrsObject;
 import org.openmrs.api.OpenmrsService;
+import org.openmrs.module.initializer.InitializerLogFactory;
 
 /**
  * Base class to any CSV line processor.
@@ -49,6 +52,8 @@ abstract public class BaseLineProcessor<T extends BaseOpenmrsObject, S extends O
 	protected Map<String, Integer> indexMap = new HashMap<String, Integer>();
 	
 	protected Map<String, LocalizedHeader> l10nHeadersMap = new HashMap<String, LocalizedHeader>();
+	
+	static Logger logger = InitializerLogFactory.getLog();
 	
 	abstract protected T bootstrap(CsvLine line) throws IllegalArgumentException;
 	
@@ -287,7 +292,7 @@ abstract public class BaseLineProcessor<T extends BaseOpenmrsObject, S extends O
 	 *         int.
 	 * @throws IllegalArgumentException
 	 */
-	public static Integer getOrder(String[] headerLine) throws IllegalArgumentException {
+	public static Integer getOrder(String[] headerLine) throws IllegalArgumentException, IOException {
 		String str = getMetadataValue(headerLine, ORDER_LHS);
 		if (UNDEFINED_METADATA_VALUE.equals(str)) { // no order means last in line
 			return Integer.MAX_VALUE;
@@ -297,8 +302,8 @@ abstract public class BaseLineProcessor<T extends BaseOpenmrsObject, S extends O
 			order = Integer.parseInt(str);
 		}
 		catch (NumberFormatException e) {
-			log.error("'" + str + "' could not be parsed as a valid integer in header line: " + Arrays.toString(headerLine),
-			    e);
+			logger.error(
+			    "'" + str + "' could not be parsed as a valid integer in header line: " + Arrays.toString(headerLine), e);
 		}
 		return order;
 	}
