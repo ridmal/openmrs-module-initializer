@@ -11,28 +11,33 @@ import java.util.List;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.openmrs.BaseOpenmrsData;
-import org.openmrs.BaseOpenmrsMetadata;
 import org.openmrs.BaseOpenmrsObject;
+import org.openmrs.Retireable;
 import org.openmrs.api.APIException;
-import org.openmrs.api.OpenmrsService;
+import org.openmrs.module.initializer.Domain;
 import org.openmrs.module.initializer.InitializerConstants;
 
 import com.opencsv.CSVReader;
 import org.openmrs.module.initializer.InitializerLogFactory;
 
-public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsService, P extends BaseLineProcessor<T, S>> {
+public abstract class CsvParser<T extends BaseOpenmrsObject, P extends BaseLineProcessor<T>> {
 	
 	protected static final String DEFAULT_RETIRE_REASON = "Retired by module " + InitializerConstants.MODULE_NAME;
 	
 	protected static final String DEFAULT_VOID_REASON = "Voided by module " + InitializerConstants.MODULE_NAME;
 	
-	// protected final Log log = LogFactory.getLog(this.getClass());
+	protected final Log log = InitializerLogFactory.getLog(CsvParser.class);
 	
 	protected CSVReader reader;
 	
-	protected S service;
+	/**
+	 * In most cases parsers rely on only one line processor, that one can be set by using
+	 * {@link #CsvParser(BaseLineProcessor)}. This processor still needs to be added to
+	 * {@link #lineProcessors} and this process happens automatically with single line processors.
+	 */
+	private BaseLineProcessor<T> singleLineProcessor = null;
 	
-	protected List<P> lineProcessors = new ArrayList<P>();
+	protected List<BaseLineProcessor<T>> lineProcessors = new ArrayList<BaseLineProcessor<T>>();
 	
 	// The header line
 	protected String[] headerLine = new String[0];
@@ -40,14 +45,56 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 	// The current line
 	protected String[] line = new String[0];
 	
-	static Log log = InitializerLogFactory.getLog(CsvParser.class);
+	protected CsvParser() {
+	}
 	
-	public CsvParser(InputStream is, S service) throws IOException {
-		this.service = service;
-		this.reader = new CSVReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-		
+	/**
+	 * Most CSV parsers are built on a single line processor. This superclass constructor should be used
+	 * to initialize such parsers.
+	 * 
+	 * @param lineProcessor The single line processor for the CSV parser.
+	 */
+	protected CsvParser(P lineProcessor) {
+		this.singleLineProcessor = lineProcessor;
+	}
+	
+	/**
+	 * Each parser implementation should specify how an instance is actually saved.
+	 * 
+	 * @param instance The domain instance to save.
+	 * @return The domain instance that has been saved.
+	 */
+	protected abstract T save(T instance);
+	
+	/**
+	 * Each parser implementation should on which domain it operates.
+	 * 
+	 * @return The {@link Domain} covered by the parser.
+	 */
+	public abstract Domain getDomain();
+	
+	/*
+	 * Parsers must set their line processors implementations based on the version
+	 * indicated in the CSV metadata headers.
+	 * 
+	 * The order of the line processors does greatly matter, make sure you add them
+	 * in the right order.
+	 */
+	protected void setLineProcessors(String version, String[] headerLine) {
+		if (singleLineProcessor == null) {
+			throw new IllegalStateException(
+			        "It was not possible to set the default single processor for the CSV parser, there was none to be found. Make sure to initialize your CSV parser with at least one line processor.");
+		}
+		lineProcessors.clear();
+		lineProcessors.add(singleLineProcessor.setHeaderLine(headerLine));
+	}
+	
+	public void setInputStream(InputStream is) throws IOException {
+		reader = new CSVReader(new InputStreamReader(is, StandardCharsets.UTF_8));
 		headerLine = reader.readNext();
+		
 		String version = P.getVersion(headerLine);
+		
 		setLineProcessors(version, headerLine);
 	}
 	
@@ -63,18 +110,93 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 		return headerLine;
 	}
 	
-	/*
-	 * The implementation should be delegated to the line processor in the subclass
+	protected T setVoidedOrRetired(boolean isVoidedOrRetired, T instance) {
+		if (instance instanceof Retireable) {
+			Retireable metadataInstance = (Retireable) instance;
+			metadataInstance.setRetired(isVoidedOrRetired);
+			metadataInstance.setRetireReason(DEFAULT_RETIRE_REASON);
+		}
+		if (instance instanceof BaseOpenmrsData) {
+			BaseOpenmrsData dataInstance = (BaseOpenmrsData) instance;
+			dataInstance.setVoided(isVoidedOrRetired);
+			dataInstance.setVoidReason(DEFAULT_VOID_REASON);
+		}
+		return instance;
+	}
+	
+	/**
+	 * Main method to proceed to save all instances fetched through parsing the CSV data.
+	 * 
+	 * @return The instances that could not be saved.
 	 */
-	protected T createInstance(String[] line) throws APIException {
+	public List<T> saveAll() {
+		
+		final List<T> failures = new ArrayList<T>();
+		
+		String[] line = null;
+		do {
+			T instance = null;
+			
+			try {
+				line = fetchNextLine();
+				instance = createInstance(line);
+				
+				if (instance != null) {
+					instance = save(instance);
+				}
+			}
+			catch (Exception e) {
+				failures.add(instance);
+				log.error("An OpenMRS object could not be constructed or saved from the following CSV line: \n"
+				        + Arrays.toString(line),
+				    e);
+			}
+		} while (line != null);
+		
+		return failures;
+	}
+	
+	/**
+	 * Saves a list of instances that have already been filled up.
+	 * 
+	 * @param instances The instances to save.
+	 * @return The instances that could not be saved.
+	 */
+	public List<T> save(List<T> instances) {
+		
+		final List<T> failures = new ArrayList<T>();
+		
+		for (T instance : instances) {
+			try {
+				if (instance != null) {
+					instance = save(instance);
+				}
+			}
+			catch (Exception e) {
+				failures.add(instance);
+				log.error("An OpenMRS object could not be saved from the following object: " + instance.toString(), e);
+			}
+		}
+		
+		return failures;
+	}
+	
+	/**
+	 * Return true if instance is actually saved in database.
+	 */
+	// protected boolean isSaved(T instance) {
+	// return instance.getId() != null;
+	// }
+	
+	private T createInstance(String[] line) throws APIException {
 		if (line == null) {
 			return null;
 		}
 		
 		// Boostrapping
-		P bootstrapper = getAnyLineProcessor();
+		BaseLineProcessor<T> bootstrapper = getAnyLineProcessor();
 		if (bootstrapper == null) { // no processors available
-			log.warn(
+			log.error(
 			    "No line processors have been set, you should either overload '" + getClass().getEnclosingMethod().getName()
 			            + "' directly or provide lines processors to this class: " + getClass().getCanonicalName());
 			return null;
@@ -86,54 +208,25 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 			        "An instance that could not be bootstrapped was not provided as an empty object either. Check the implementation of this parser: "
 			                + getClass().getSuperclass().getCanonicalName());
 		}
-		if (isVoidedOrRetired(instance)) {
-			if (instance instanceof BaseOpenmrsMetadata) {
-				((BaseOpenmrsMetadata) instance).setRetireReason(DEFAULT_RETIRE_REASON);
-			}
-			if (instance instanceof BaseOpenmrsData) {
-				((BaseOpenmrsData) instance).setVoidReason(DEFAULT_VOID_REASON);
-			}
+		
+		boolean voidedOrRetired = BaseLineProcessor.getVoidOrRetire(headerLine, line);
+		instance = setVoidedOrRetired(voidedOrRetired, instance);
+		if (voidedOrRetired) {
 			return instance;
 		}
 		
 		// Applying the lines processors in order
-		for (P processor : getLineProcessors()) {
+		for (BaseLineProcessor<T> processor : lineProcessors) {
 			instance = processor.fill(instance, new CsvLine(processor, line));
 		}
 		return instance;
 	}
 	
 	/*
-	 * The actual saving should be implemented in this method.
-	 */
-	abstract protected T save(T instance);
-	
-	/*
-	 * Says if the CSV line is marked for voiding or retiring.
-	 */
-	abstract protected boolean isVoidedOrRetired(T instance);
-	
-	/*
-	 * Parsers must set their line processor implementation based on the version
-	 * indicated in the CSV metadata headers.
-	 * 
-	 * You should add the line processors in the order that you want them to follow.
-	 */
-	abstract protected void setLineProcessors(String version, String[] headerLine);
-	
-	protected void addLineProcessor(P lineProcessor) {
-		lineProcessors.add(lineProcessor);
-	}
-	
-	protected List<P> getLineProcessors() {
-		return this.lineProcessors;
-	}
-	
-	/*
 	 * Returns null if there are no processors set.
 	 */
-	protected P getAnyLineProcessor() {
-		return getLineProcessors().iterator().next();
+	protected BaseLineProcessor<T> getAnyLineProcessor() {
+		return lineProcessors.iterator().next();
 	}
 	
 	/*
@@ -159,43 +252,5 @@ public abstract class CsvParser<T extends BaseOpenmrsObject, S extends OpenmrsSe
 	
 	protected void close() throws IOException {
 		reader.close();
-	}
-	
-	/**
-	 * Main method to proceed to save all instances fetched through parsing the CSV data.
-	 * 
-	 * @return The list of saved OpenMRS objects instances.
-	 */
-	public List<T> saveAll() {
-		
-		List<T> instances = new ArrayList<T>();
-		
-		String[] line = null;
-		do {
-			try {
-				line = fetchNextLine();
-				T instance = createInstance(line);
-				if (instance != null) {
-					instance = save(instance);
-					if (isSaved(instance)) {
-						instances.add(instance);
-					}
-				}
-			}
-			catch (Exception e) {
-				log.error("An OpenMRS object could not be constructed or saved from the following CSV line: "
-				        + Arrays.toString(line),
-				    e);
-			}
-		} while (line != null);
-		
-		return instances;
-	}
-	
-	/**
-	 * Return true if instance is actually saved in database.
-	 */
-	protected boolean isSaved(T instance) {
-		return instance.getId() != null;
 	}
 }

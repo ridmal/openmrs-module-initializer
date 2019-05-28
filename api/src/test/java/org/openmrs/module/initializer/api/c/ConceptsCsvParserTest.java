@@ -7,11 +7,8 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Random;
-import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -22,6 +19,8 @@ import org.openmrs.Concept;
 import org.openmrs.ConceptClass;
 import org.openmrs.ConceptDatatype;
 import org.openmrs.api.ConceptService;
+import org.openmrs.module.initializer.api.utils.ConceptListParser;
+import org.openmrs.module.initializer.api.utils.ConceptMapListParser;
 
 /*
  * This kind of test case can be used to quickly trial the parsing routines on test CSVs
@@ -29,10 +28,6 @@ import org.openmrs.api.ConceptService;
 public class ConceptsCsvParserTest {
 	
 	private ConceptService cs = mock(ConceptService.class);
-	
-	final private Locale localeEn = Locale.ENGLISH;
-	
-	final private Locale localeKm = new Locale("km", "KH");
 	
 	@Before
 	public void setup() {
@@ -81,46 +76,39 @@ public class ConceptsCsvParserTest {
 		        .getResourceAsStream("testAppDataDir/configuration/concepts/concepts_base.csv");
 		
 		// replay
-		List<Concept> concepts = new ConceptsCsvParser(is, cs).saveAll();
+		ConceptsCsvParser parser = new ConceptsCsvParser(cs, new ConceptLineProcessor(cs),
+		        new ConceptNumericLineProcessor(cs), new ConceptComplexLineProcessor(cs),
+		        new NestedConceptLineProcessor(cs, new ConceptListParser(cs)),
+		        new MappingsConceptLineProcessor(cs, new ConceptMapListParser(cs)));
+		parser.setInputStream(is);
+		List<Concept> conceptsFailures = parser.saveAll();
 		
 		// verif
-		Assert.assertEquals(14, concepts.size());
-		Concept c = null;
-		c = concepts.get(0);
-		Assert.assertEquals("Cambodia_Nationality", c.getFullySpecifiedName(localeEn).getName());
-		Assert.assertEquals("Coded", c.getDatatype().getName());
-		Assert.assertEquals("Question", c.getConceptClass().getName());
-		Assert.assertEquals("កម្ពុជា_សញ្ជាតិ", c.getFullySpecifiedName(localeKm).getName());
-		
-		c = concepts.get(4);
-		Assert.assertEquals("db2f4fc4-3171-11e7-93ae-92361f002671", c.getUuid());
-		Assert.assertEquals("Cambodia_Phnong", c.getFullySpecifiedName(localeEn).getName());
-		Assert.assertEquals("Text", c.getDatatype().getName());
-		Assert.assertEquals("Misc", c.getConceptClass().getName());
-		Assert.assertEquals("ព្នង", c.getShortestName(localeKm, true).getName());
-		
-		// the faulty uuid should not be in there
-		Set<String> uuids = new HashSet<String>();
-		for (Concept cpt : concepts) {
-			uuids.add(cpt.getUuid());
-		}
-		Assert.assertFalse(uuids.contains("foobar"));
+		Assert.assertEquals(1, conceptsFailures.size());
+		Assert.assertNull(conceptsFailures.get(0)); // the one instance could not even be bootstrapped
 	}
 	
 	@Test
 	public void saveAll_shouldFailOnMisformattedCsv() throws IOException {
+		ConceptsCsvParser parser = new ConceptsCsvParser(cs, new ConceptLineProcessor(cs),
+		        new ConceptNumericLineProcessor(cs), new ConceptComplexLineProcessor(cs),
+		        new NestedConceptLineProcessor(cs, new ConceptListParser(cs)),
+		        new MappingsConceptLineProcessor(cs, new ConceptMapListParser(cs)));
 		InputStream is = null;
 		
 		is = getClass().getClassLoader()
 		        .getResourceAsStream("org/openmrs/module/initializer/include/csv/concepts_no_uuid.csv");
-		Assert.assertTrue(new ConceptsCsvParser(is, cs).saveAll().isEmpty());
+		parser.setInputStream(is);
+		Assert.assertEquals(parser.saveAll().size(), 1);
 		
 		is = getClass().getClassLoader()
 		        .getResourceAsStream("org/openmrs/module/initializer/include/csv/concepts_no_fsn.csv");
-		Assert.assertTrue(new ConceptsCsvParser(is, cs).saveAll().isEmpty());
+		parser.setInputStream(is);
+		Assert.assertEquals(parser.saveAll().size(), 1);
 		
 		is = getClass().getClassLoader()
 		        .getResourceAsStream("org/openmrs/module/initializer/include/csv/concepts_no_shortname.csv");
-		Assert.assertTrue(new ConceptsCsvParser(is, cs).saveAll().isEmpty());
+		parser.setInputStream(is);
+		Assert.assertEquals(parser.saveAll().size(), 1);
 	}
 }

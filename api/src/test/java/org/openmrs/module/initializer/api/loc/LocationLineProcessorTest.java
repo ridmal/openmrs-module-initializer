@@ -16,6 +16,7 @@ import org.openmrs.Location;
 import org.openmrs.LocationTag;
 import org.openmrs.api.LocationService;
 import org.openmrs.module.initializer.api.CsvLine;
+import org.openmrs.module.initializer.api.utils.LocationTagListParser;
 
 /*
  * This kind of test case can be used to quickly trial the parsing routines on test CSVs
@@ -50,7 +51,8 @@ public class LocationLineProcessorTest {
 		String[] line = { "Login Location; Visit Location" };
 		
 		// Replay
-		LocationLineProcessor p = new LocationLineProcessor(headerLine, ls);
+		LocationLineProcessor p = new LocationLineProcessor(ls, new LocationTagListParser(ls));
+		p.setHeaderLine(headerLine);
 		Location c = p.fill(new Location(), new CsvLine(p, line));
 		
 		// Verif

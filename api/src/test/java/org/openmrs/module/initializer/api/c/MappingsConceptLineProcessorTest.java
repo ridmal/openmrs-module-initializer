@@ -20,6 +20,7 @@ import org.openmrs.ConceptMapType;
 import org.openmrs.ConceptSource;
 import org.openmrs.api.ConceptService;
 import org.openmrs.module.initializer.api.CsvLine;
+import org.openmrs.module.initializer.api.utils.ConceptMapListParser;
 
 /*
  * This kind of test case can be used to quickly trial the parsing routines on test CSVs
@@ -71,7 +72,8 @@ public class MappingsConceptLineProcessorTest {
 		String[] line = { "cambodia:123; foo:456" };
 		
 		// Replay
-		MappingsConceptLineProcessor p = new MappingsConceptLineProcessor(headerLine, cs);
+		MappingsConceptLineProcessor p = new MappingsConceptLineProcessor(cs, new ConceptMapListParser(cs));
+		p.setHeaderLine(headerLine);
 		Concept c = p.fill(new Concept(), new CsvLine(p, line));
 		
 		// Verif
@@ -95,7 +97,8 @@ public class MappingsConceptLineProcessorTest {
 		String[] line = { null };
 		
 		// Replay
-		MappingsConceptLineProcessor p = new MappingsConceptLineProcessor(headerLine, cs);
+		MappingsConceptLineProcessor p = new MappingsConceptLineProcessor(cs, new ConceptMapListParser(cs));
+		p.setHeaderLine(headerLine);
 		Concept c = p.fill(new Concept(), new CsvLine(p, line));
 		
 		// Verif
@@ -109,7 +112,8 @@ public class MappingsConceptLineProcessorTest {
 		String[] line = {};
 		
 		// Replay
-		MappingsConceptLineProcessor p = new MappingsConceptLineProcessor(headerLine, cs);
+		MappingsConceptLineProcessor p = new MappingsConceptLineProcessor(cs, new ConceptMapListParser(cs));
+		p.setHeaderLine(headerLine);
 		Concept c = p.fill(new Concept(), new CsvLine(p, line));
 		Assert.assertNull(c.getConceptMappings());
 	}

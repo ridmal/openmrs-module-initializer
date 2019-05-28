@@ -1,7 +1,6 @@
 package org.openmrs.module.initializer.api.loc;
 
 import java.util.HashSet;
-import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openmrs.Location;
@@ -9,9 +8,14 @@ import org.openmrs.LocationTag;
 import org.openmrs.api.LocationService;
 import org.openmrs.module.initializer.api.BaseLineProcessor;
 import org.openmrs.module.initializer.api.CsvLine;
-import org.openmrs.module.initializer.api.Utils;
+import org.openmrs.module.initializer.api.utils.LocationTagListParser;
+import org.openmrs.module.initializer.api.utils.Utils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
 
-public class LocationLineProcessor extends BaseLineProcessor<Location, LocationService> {
+@Component
+public class LocationLineProcessor extends BaseLineProcessor<Location> {
 	
 	protected static String HEADER_PARENT = "parent";
 	
@@ -39,42 +43,29 @@ public class LocationLineProcessor extends BaseLineProcessor<Location, LocationS
 	
 	protected static String HEADER_ADDRESS_6 = "address 6";
 	
-	public LocationLineProcessor(String[] headerLine, LocationService ls) {
-		super(headerLine, ls);
-	}
+	private LocationService locationService;
 	
-	protected static Set<LocationTag> parseLocationTagsList(String tagsList, LocationService ls)
-	        throws IllegalArgumentException {
-		Set<LocationTag> tags = new HashSet<LocationTag>();
-		
-		String[] parts = tagsList.split(BaseLineProcessor.LIST_SEPARATOR);
-		
-		for (String tagName : parts) {
-			tagName = tagName.trim();
-			LocationTag tag = ls.getLocationTagByName(tagName); // assuming location tag names only
-			if (tag == null) {
-				log.info("The location tag identified by '" + tagName + "' was not found in database. Creating it...");
-				tag = ls.saveLocationTag(new LocationTag(tagName, ""));
-			}
-			tags.add(tag);
-		}
-		
-		return tags;
+	private LocationTagListParser listParser;
+	
+	@Autowired
+	public LocationLineProcessor(@Qualifier("locationService") LocationService locationService,
+	    LocationTagListParser listParser) {
+		this.locationService = locationService;
+		this.listParser = listParser;
 	}
 	
 	@Override
 	protected Location bootstrap(CsvLine line) throws IllegalArgumentException {
-		String uuid = getUuid(line.asLine());
-		Location loc = service.getLocationByUuid(uuid);
 		
+		String uuid = getUuid(line.asLine());
+		
+		Location loc = locationService.getLocationByUuid(uuid);
 		if (loc == null) {
 			loc = new Location();
 			if (!StringUtils.isEmpty(uuid)) {
 				loc.setUuid(uuid);
 			}
 		}
-		
-		loc.setRetired(getVoidOrRetire(line.asLine()));
 		
 		return loc;
 	}
@@ -88,13 +79,13 @@ public class LocationLineProcessor extends BaseLineProcessor<Location, LocationS
 		loc.setParentLocation(null);
 		String parentId = line.getString(HEADER_PARENT, "");
 		if (!StringUtils.isEmpty(parentId)) {
-			loc.setParentLocation(Utils.fetchLocation(parentId, service));
+			loc.setParentLocation(Utils.fetchLocation(parentId, locationService));
 		}
 		
 		loc.setTags(null);
 		String tags = line.getString(HEADER_TAGS, "");
 		if (!StringUtils.isEmpty(tags)) {
-			loc.setTags(parseLocationTagsList(tags, service));
+			loc.setTags(new HashSet<LocationTag>(listParser.parseList(tags)));
 		}
 		
 		loc.setCityVillage(line.get(HEADER_CITY_VILLAGE));
