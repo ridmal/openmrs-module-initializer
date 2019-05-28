@@ -12,8 +12,6 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.Logger;
 import org.openmrs.BaseOpenmrsObject;
 import org.openmrs.api.OpenmrsService;
 import org.openmrs.module.initializer.InitializerLogFactory;
@@ -23,7 +21,7 @@ import org.openmrs.module.initializer.InitializerLogFactory;
  */
 abstract public class BaseLineProcessor<T extends BaseOpenmrsObject, S extends OpenmrsService> {
 	
-	protected final static Log log = LogFactory.getLog(BaseLineProcessor.class);
+	// protected final static Log log = LogFactory.getLog(BaseLineProcessor.class);
 	
 	protected static String HEADER_UUID = "uuid";
 	
@@ -53,7 +51,7 @@ abstract public class BaseLineProcessor<T extends BaseOpenmrsObject, S extends O
 	
 	protected Map<String, LocalizedHeader> l10nHeadersMap = new HashMap<String, LocalizedHeader>();
 	
-	static Logger logger = InitializerLogFactory.getLog();
+	protected final static Log log = InitializerLogFactory.getLog(BaseLineProcessor.class);
 	
 	abstract protected T bootstrap(CsvLine line) throws IllegalArgumentException;
 	
@@ -302,8 +300,8 @@ abstract public class BaseLineProcessor<T extends BaseOpenmrsObject, S extends O
 			order = Integer.parseInt(str);
 		}
 		catch (NumberFormatException e) {
-			logger.error(
-			    "'" + str + "' could not be parsed as a valid integer in header line: " + Arrays.toString(headerLine), e);
+			log.error("'" + str + "' could not be parsed as a valid integer in header line: " + Arrays.toString(headerLine),
+			    e);
 		}
 		return order;
 	}

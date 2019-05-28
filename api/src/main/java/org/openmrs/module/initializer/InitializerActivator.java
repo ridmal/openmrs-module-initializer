@@ -9,22 +9,18 @@
  */
 package org.openmrs.module.initializer;
 
-import org.apache.log4j.PropertyConfigurator;
+import org.apache.commons.logging.Log;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.BaseModuleActivator;
 import org.openmrs.module.initializer.api.InitializerService;
 import org.openmrs.module.initializer.api.loaders.Loader;
-
-import org.apache.log4j.Logger;
-
-import java.io.IOException;
 
 /**
  * This class contains the logic that is run every time this module is either started or shutdown
  */
 public class InitializerActivator extends BaseModuleActivator {
 	
-	static Logger logger = InitializerLogFactory.getLog();
+	static Log log = InitializerLogFactory.getLog(InitializerActivator.class);
 	
 	/**
 	 * @see #started()
@@ -37,7 +33,7 @@ public class InitializerActivator extends BaseModuleActivator {
 			loader.load();
 		}
 		
-		logger.info("Start of initializer module.");
+		log.info("Start of initializer module.");
 		
 	}
 	

@@ -1,5 +1,7 @@
 package org.openmrs.module.initializer;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -10,30 +12,42 @@ import java.io.IOException;
 
 public class InitializerLogFactory {
 	
-	static Logger logger = null;
-	
 	static String targetLog = OpenmrsUtil.getApplicationDataDirectory() + "initializer.log";
 	
 	static FileAppender inizAppender = null;
 	
-	private static Logger setUpLogger() throws IOException {
-		logger = Logger.getLogger("org.openmrs.module.initializer");
-		inizAppender = new FileAppender(new PatternLayout("%d %-5p [%c{1}] %m%n"), targetLog, true);
+	static Log log = null;
+	
+	/**
+	 * SetUp new InitializerLoggerWrapper instance.
+	 * 
+	 * @param className class which called InitializerLogFactory
+	 * @return loggerWrapper instance.
+	 * @throws IOException
+	 */
+	private static Log setUpLog(Class className) throws IOException {
+		Log log = LogFactory.getLog(className);
+		Logger logger = Logger.getLogger(className);
+		inizAppender = new FileAppender(new PatternLayout("%d{ABSOLUTE} %-5p [%c{1}] %m%n"), targetLog, true);
 		logger.addAppender(inizAppender);
 		logger.setLevel((Level) Level.ALL);
-		return logger;
+		return new InitializerLoggerWrapper(log, logger);
 	}
 	
-	public static Logger getLog() {
-		if (logger == null) {
+	/**
+	 * @param className class which called InitializerLogFactory
+	 * @return Custom Log instance.
+	 */
+	public static Log getLog(Class className) {
+		if (log == null) {
 			try {
-				logger = setUpLogger();
+				log = setUpLog(className);
 			}
 			catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
-		return logger;
+		return log;
 	}
 	
 }
